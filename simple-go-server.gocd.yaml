@@ -49,12 +49,12 @@ pipelines:
                     source: 'template.gocd.json'
                     destination: ''
                 - build:
-                    source: 'release.sh'
+                    source: 'pipeline_setup.sh'
                     destination: ''
               tasks:
                 - exec:
                     arguments:
                       - "-c"
-                      - ./export.sh
+                      - ./template.sh
                     command: bash
                     run_if: passed
