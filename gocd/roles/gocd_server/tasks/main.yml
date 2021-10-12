@@ -1,0 +1,162 @@
+- name: Setup gocd repo
+  become: yes
+  copy:
+    dest: /etc/yum.repos.d/gocd.repo
+    src: gocd.repo
+    owner: root
+    group: root
+    mode: 0444
+
+- name: Add cache directory for yum
+  become: yes
+  blockinfile:
+    path: /etc/yum.conf
+    marker: "# --- {mark} Added by Ansible ---"
+    insertbefore: "EOF"
+    block: |
+      cachedir=/vagrant-cache/tmp/yum/$basearch/$releasever
+      keepcache=1
+
+- name: Create go group
+  become: yes
+  group:
+    name: go
+    gid: "{{ gogid }}"
+    system: yes
+
+- name: Create go user
+  become: yes
+  user:
+    name: go
+    comment: GoCD User
+    uid: "{{ gouid }}"
+    group: go
+    shell: /bin/bash
+    home: /var/go
+    create_home: yes
+
+- name: Setup data directory
+  become: yes
+  file:
+    path: "{{ item }}"
+    owner: go
+    group: go
+    mode: 0750
+    state: directory
+  with_items:
+    - /data
+    - /data/var-log-go-server
+    - /data/var-lib-go-server
+    - /data/var-lib-go-server/libs
+
+- name: Create symlinks
+  become: yes
+  file:
+    path: "{{ item.path }}"
+    src: "{{ item.src }}"
+    force: yes
+    state: link
+    owner: go
+    group: go
+  with_items:
+    - {'src': '/data/var-lib-go-server', 'path': '/var/lib/go-server' }
+    - {'src': '/data/var-log-go-server', 'path': '/var/log/go-server' }
+
+- name: Install required packages
+  become: yes
+  package:
+    name:
+      - git
+      - python-lxml
+      - python-requests
+      - python-passlib
+      - httpd-tools
+      - go-server-21.2.0-12498
+
+- name: Update wrapper-config
+  become: yes
+  blockinfile:
+    path: /usr/share/go-server/wrapper-config/wrapper-properties.conf
+    marker: "# --- {mark} Added by Ansible ---"
+    insertbefore: 'EOF'
+    block: |
+      wrapper.java.additional.114=-Djava.rmi.server.hostname=192.168.199.11
+      wrapper.java.additional.115=-Dcom.sun.management.jmxremote
+      wrapper.java.additional.116=-Dcom.sun.management.jmxremote.authenticate=false
+      wrapper.java.additional.117=-Dcom.sun.management.jmxremote.ssl=false
+      wrapper.java.additional.118=-Dcom.sun.management.jmxremote.port=1100
+      wrapper.java.additional.119=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+  notify: "restart gocd server"
+
+- name: Update wrapper for debugging
+  become: yes
+  blockinfile:
+    path: /usr/share/go-server/wrapper-config/wrapper.conf
+    marker: "# --- {mark} Added by Ansible ---"
+    insertbefore: 'EOF'
+    block: |
+      wrapper.ping.interval=6000
+  notify: "restart gocd server"
+
+- name: Setup gocd repo
+  become: yes
+  copy:
+    dest: /etc/go/cipher.aes
+    src: cipher.aes
+    owner: go
+    group: go
+    mode: 0644
+
+- name: Start gocd server
+  include_tasks: restart.yml
+  vars:
+    state: started
+
+- name: Install external plugins
+  include_tasks: plugins.yml
+
+- name: Setup admin user
+  include_tasks: admin.yml
+
+- name: Setup backup
+  include_tasks: backup.yml
+
+- name: Add auto-registration key
+  become: yes
+  xml:
+    path: "/etc/go/cruise-config.xml"
+    xpath: "/cruise/server"
+    attribute: "agentAutoRegisterKey"
+    value: "{{ agentAutoRegisterKey }}"
+  notify: "restart gocd server"
+
+- name: Configure artifacts
+  become: yes
+  gocd_api:
+    domain: "{{ domain }}"
+    config_type: 'artifacts'
+    username: "{{ adminUsername }}"
+    password: "{{ adminPassword }}"
+    data: "{{ artifactsData }}"
+
+- name: Configure default job timeout
+  become: yes
+  gocd_api:
+    domain: "{{ domain }}"
+    config_type: 'default_job_timeout'
+    username: "{{ adminUsername }}"
+    password: "{{ adminPassword }}"
+    data: "{{ defaultJobTimeoutData }}"
+
+- name: Configure pipeline-groups
+  become: yes
+  gocd_api:
+    domain: "{{ domain }}"
+    config_type: 'pipeline_groups'
+    entity_id: "{{ item.name }}"
+    username: "{{ adminUsername }}"
+    password: "{{ adminPassword }}"
+    data: "{{ item }}"
+  with_items: "{{ pipelineGroupsData }}"
+
+- include: nginx.yml
