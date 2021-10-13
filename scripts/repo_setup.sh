@@ -14,7 +14,7 @@ local action=$2
 #token=$1
 #action=$2
 
-for i in {76..100}
+for i in {70..78}
 do
   echo Test-REPO$i
   echo $action

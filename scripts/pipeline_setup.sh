@@ -44,14 +44,14 @@ else
 fi
 
 ## Build pipeline yaml file
-for i in {76..100}
+for i in {1..78}
 do
   echo "Test-REPO$i"
 ## Build pipeline yaml file
 cd /Users/siddhi.kadam/REPO/gocd-server/scripts
 yq d $PROJECT_NAME.gocd.yaml 'pipelines.*.stages' | \
     yq w - "pipelines.$PROJECT_NAME.template" "$template_name" | \
-    sed "s/testing-pipelines.git/Test-REPO$i.git/g;s/$PROJECT_NAME:/Test-REPO$i-release:/g" > "Test-REPO$i-release.gocd.yaml"
+    sed "s/Test-REPO/Test-REPO$i/g;s/testing-pipelines.git/Test-REPO$i.git/g;s/$PROJECT_NAME:/Test-REPO$i-release:/g" > "Test-REPO$i-release.gocd.yaml"
 
 #set +e
 #ssh -o StrictHostKeyChecking=no git@github.com

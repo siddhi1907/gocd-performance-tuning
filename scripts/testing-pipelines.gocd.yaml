@@ -6,7 +6,7 @@ pipelines:
     lock_behavior: none
     display_order: -1
     materials:
-      git:
+      Test-REPO:
         git: https://github.com/siddhi1907/testing-pipelines.git
         shallow_clone: false
         auto_update: true

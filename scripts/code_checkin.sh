@@ -13,7 +13,7 @@ GITHUBUSER=$(git config github.user)
 #token=$1
 #action=$2
 
-for i in {3..10}
+for i in {1..10}
 do
   echo Test-REPO$i
 
